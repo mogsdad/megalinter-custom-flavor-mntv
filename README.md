@@ -1,0 +1,1 @@
+# megalinter-custom-flavor-mntv
