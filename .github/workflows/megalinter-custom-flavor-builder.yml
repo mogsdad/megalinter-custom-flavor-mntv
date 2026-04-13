@@ -49,9 +49,6 @@ jobs:
   build-custom-flavor:
     name: Build Custom MegaLinter Flavor
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform: [linux/amd64, linux/arm64]
     permissions:
       contents: read
       packages: write
@@ -105,18 +102,18 @@ jobs:
 
       # Log in to Docker Hub only if credentials are provided
       - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
         uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-        continue-on-error: true
 
-      - name: Build MegaLinter Custom Flavor (${{ matrix.platform }})
+      - name: Build MegaLinter Custom Flavor
         uses: oxsecurity/megalinter/flavors/custom-builder@main
         with:
           megalinter-custom-flavor-builder-tag: ${{ steps.determine-tag.outputs.tag }}
-          platform: ${{ matrix.platform }}
+          platform: "linux/amd64,linux/arm64"
           is-latest: ${{ steps.determine-tag.outputs.is-latest }}
           upload-to-ghcr: "true"
           upload-to-dockerhub: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' && 'true' || 'false' }}
