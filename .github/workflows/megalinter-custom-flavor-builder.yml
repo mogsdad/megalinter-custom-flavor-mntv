@@ -125,7 +125,7 @@ jobs:
           platform: "linux/amd64,linux/arm64"
           is-latest: ${{ steps.determine-tag.outputs.is-latest }}
           upload-to-ghcr: "true"
-          upload-to-dockerhub: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' && 'true' || 'false' }}
+          upload-to-dockerhub: ${{ steps.dockerhub-creds.outputs.has-creds }}
           dockerhub-repo: ${{ vars.DOCKERHUB_REPO }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
