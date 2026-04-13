@@ -119,17 +119,47 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build MegaLinter Custom Flavor
-        uses: oxsecurity/megalinter/flavors/custom-builder@main
-        with:
-          megalinter-custom-flavor-builder-tag: ${{ steps.determine-tag.outputs.tag }}
-          platform: ${{ matrix.platform }}
-          is-latest: ${{ steps.determine-tag.outputs.is-latest }}
-          upload-to-ghcr: "true"
-          upload-to-dockerhub: ${{ steps.dockerhub-creds.outputs.has-creds }}
-          dockerhub-repo: ${{ vars.DOCKERHUB_REPO }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_FLAVOR_BUILD_REPO: ${{ github.repository }}
-          CUSTOM_FLAVOR_BUILD_REPO_URL: ${{ github.repositoryUrl }}
-          CUSTOM_FLAVOR_BUILD_USER: ${{ github.actor }}
+      - name: Build custom flavor image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock:rw \
+            -v "$GITHUB_WORKSPACE":/github/workspace \
+              -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+              -e CUSTOM_FLAVOR_PLATFORM="${{ matrix.platform }}" \
+              -e CUSTOM_FLAVOR_BUILD_REPO="${{ github.repository }}" \
+              -e CUSTOM_FLAVOR_BUILD_REPO_URL="${{ github.repositoryUrl }}" \
+              -e CUSTOM_FLAVOR_BUILD_USER="${{ github.actor }}" \
+            "ghcr.io/oxsecurity/megalinter-custom-flavor-builder:${{ steps.determine-tag.outputs.tag }}"
+
+      - name: Tag and push image
+        run: |
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '/' '_')
+          IMAGE_VERSION=$(docker inspect --format='{{index .Config.Labels "org.opencontainers.image.version"}}' "$IMAGE_NAME")
+          GHCR_IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/megalinter-custom-flavor"
+
+          echo "Custom flavor image name: $IMAGE_NAME"
+          echo "Custom flavor image version: $IMAGE_VERSION"
+
+          docker tag "$IMAGE_NAME" "$GHCR_IMAGE:$IMAGE_VERSION"
+          docker push "$GHCR_IMAGE:$IMAGE_VERSION"
+
+          if [ "${{ steps.determine-tag.outputs.is-latest }}" = "true" ]; then
+            docker tag "$IMAGE_NAME" "$GHCR_IMAGE:latest"
+            docker push "$GHCR_IMAGE:latest"
+          fi
+
+          if [ "${{ steps.dockerhub-creds.outputs.has-creds }}" = "true" ]; then
+            if [ -n "${{ vars.DOCKERHUB_REPO }}" ]; then
+              DOCKERHUB_IMAGE="${{ vars.DOCKERHUB_REPO }}/${{ github.event.repository.name }}-megalinter-custom-flavor"
+            else
+              DOCKERHUB_IMAGE="${{ github.repository_owner }}/${{ github.event.repository.name }}-megalinter-custom-flavor"
+            fi
+
+            docker tag "$IMAGE_NAME" "$DOCKERHUB_IMAGE:$IMAGE_VERSION"
+            docker push "$DOCKERHUB_IMAGE:$IMAGE_VERSION"
+
+            if [ "${{ steps.determine-tag.outputs.is-latest }}" = "true" ]; then
+              docker tag "$IMAGE_NAME" "$DOCKERHUB_IMAGE:latest"
+              docker push "$DOCKERHUB_IMAGE:latest"
+            fi
+          fi
