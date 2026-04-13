@@ -100,9 +100,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check Docker Hub credentials
+        id: dockerhub-creds
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_PASSWORD }}" ]; then
+            echo "has-creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-creds=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Log in to Docker Hub only if credentials are provided
       - name: Log in to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
+        if: ${{ steps.dockerhub-creds.outputs.has-creds == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: docker.io
